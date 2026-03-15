@@ -74,6 +74,21 @@ export function getProviderCredentials(provider: string): ProviderCredentials | 
     };
   }
 
+  // Generic OpenAI-compatible endpoint via LLM_API_URL/LLM_API_KEY/LLM_MODEL
+  if (provider === 'generic') {
+    const apiUrl = process.env.LLM_API_URL;
+    const apiKey = process.env.LLM_API_KEY;
+    if (!apiUrl || !apiKey) return null;
+    return {
+      apiUrl,
+      model: process.env.LLM_MODEL || 'gpt-3.5-turbo',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    };
+  }
+
   return null;
 }
 
@@ -97,7 +112,7 @@ export function stripThinkingTags(text: string): string {
   return s;
 }
 
-const PROVIDER_CHAIN = ['ollama', 'groq', 'openrouter'] as const;
+const PROVIDER_CHAIN = ['ollama', 'groq', 'openrouter', 'generic'] as const;
 
 export interface LlmCallOptions {
   messages: Array<{ role: string; content: string }>;
