@@ -414,13 +414,68 @@ if (!('__TAURI_INTERNALS__' in window) && !('__TAURI__' in window) && 'serviceWo
     window.location.reload();
   });
 
+  const SW_UPDATE_MIN_INTERVAL_MS = 60 * 60 * 1000;
+  const SW_UPDATE_LAST_CHECK_KEY = 'wm-sw-last-update-check';
+
+  const readLastSwUpdateCheck = (): number => {
+    try {
+      const raw = localStorage.getItem(SW_UPDATE_LAST_CHECK_KEY);
+      const parsed = raw ? Number(raw) : 0;
+      return Number.isFinite(parsed) ? parsed : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const writeLastSwUpdateCheck = (timestamp: number): void => {
+    try {
+      localStorage.setItem(SW_UPDATE_LAST_CHECK_KEY, String(timestamp));
+    } catch {}
+  };
+
   navigator.serviceWorker.register('/sw.js', { scope: '/' })
     .then((registration) => {
       console.log('[PWA] Service worker registered');
-      const swUpdateInterval = setInterval(async () => {
+
+      let swUpdateInFlight = false;
+
+      const maybeCheckForSwUpdate = async (
+        reason: 'initial' | 'visible' | 'online' | 'interval'
+      ): Promise<void> => {
+        if (swUpdateInFlight) return;
         if (!navigator.onLine) return;
-        try { await registration.update(); } catch {}
-      }, 5 * 60 * 1000);
+        if (reason === 'interval' && document.visibilityState !== 'visible') return;
+
+        const now = Date.now();
+        const lastCheck = readLastSwUpdateCheck();
+        if (now - lastCheck < SW_UPDATE_MIN_INTERVAL_MS) return;
+
+        swUpdateInFlight = true;
+        writeLastSwUpdateCheck(now);
+        try {
+          await registration.update();
+        } catch {}
+        finally {
+          swUpdateInFlight = false;
+        }
+      };
+
+      void maybeCheckForSwUpdate('initial');
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          void maybeCheckForSwUpdate('visible');
+        }
+      });
+
+      window.addEventListener('online', () => {
+        void maybeCheckForSwUpdate('online');
+      });
+
+      const swUpdateInterval = window.setInterval(() => {
+        void maybeCheckForSwUpdate('interval');
+      }, SW_UPDATE_MIN_INTERVAL_MS);
+
       (window as unknown as Record<string, unknown>).__swUpdateInterval = swUpdateInterval;
     })
     .catch((err) => {
