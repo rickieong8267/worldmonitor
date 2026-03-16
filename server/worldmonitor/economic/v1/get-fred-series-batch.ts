@@ -15,7 +15,7 @@ const REDIS_CACHE_TTL = 3600;
 
 const ALLOWED_SERIES = new Set([
   'WALCL', 'FEDFUNDS', 'T10Y2Y', 'UNRATE', 'CPIAUCSL', 'DGS10', 'VIXCLS',
-  'GDP', 'M2SL', 'DCOILWTICO',
+  'GDP', 'M2SL', 'DCOILWTICO', 'BAMLH0A0HYM2', 'ICSA', 'MORTGAGE30US', 'GSCPI',
 ]);
 
 async function fetchSingleFred(seriesId: string, limit: number): Promise<FredSeries | undefined> {
@@ -74,7 +74,7 @@ export async function getFredSeriesBatch(
     const normalized = req.seriesIds
       .map((id) => id.trim().toUpperCase())
       .filter((id) => ALLOWED_SERIES.has(id));
-    const limitedList = toUniqueSortedLimited(normalized, 10);
+    const limitedList = toUniqueSortedLimited(normalized, 20);
     const limit = req.limit > 0 ? Math.min(req.limit, 1000) : 120;
 
     const results: Record<string, FredSeries> = {};
@@ -93,7 +93,7 @@ export async function getFredSeriesBatch(
       }
     }
 
-    // Fetch all uncached series in parallel (max 10, each hits separate FRED endpoint)
+    // Fetch all uncached series in parallel (max 20, each hits separate FRED endpoint)
     await Promise.allSettled(
       toFetch.map(async (id) => {
         const cacheResult = await cachedFetchJson<{ series?: FredSeries }>(
